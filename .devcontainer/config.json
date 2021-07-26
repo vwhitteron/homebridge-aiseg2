@@ -1,0 +1,23 @@
+{
+    "bridge": {
+        "name": "Homebridge 4E5F",
+        "username": "0A:1B:2C:3D:4E:5F",
+        "port": 51846,
+        "pin": "123-45-678"
+    },
+    "accessories": [],
+    "platforms": [
+        {
+            "name": "Config",
+            "port": 8581,
+            "platform": "config"
+        },
+        {
+            "name": "AiSEG2",
+            "autodiscover": false,
+            "host": "192.168.0.20",
+            "password": "secretpassword",
+            "platform": "AiSEG2"
+        }
+    ]
+}

@@ -9,7 +9,31 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Panasonic AiSEG2"
+        "default": "AiSEG2"
+      },
+      "autodiscover": {
+        "title": "Auto discover AiSEG2 controllers",
+        "type": "boolean",
+        "default": false,
+        "description": "Not yet implemented"
+      },
+      "host": {
+        "title": "Hostname or IP",
+        "type": "string",
+        "required": true,
+        "format": "hostname",
+        "default": "127.0.0.1",
+        "condition": {
+          "functionBody": "return model.autodiscover === false;"
+        },
+        "description": "The hostname or IP address of the Panasonic AiSEG2 controller"
+      },
+      "password": {
+        "title": "Password",
+        "type": "string",
+        "required": true,
+        "default": "",
+        "description": "Password used to login to the Panasonic AiSEG2 controller"
       }
     }
   }
