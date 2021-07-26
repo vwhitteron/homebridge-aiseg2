@@ -2,6 +2,9 @@
 ARG IMAGE_TAG="latest"
 FROM oznu/homebridge:${IMAGE_TAG}
 
+ADD config.json /var/lib/homebridge/config.json
+ADD startup.json /var/lib/homebridge/.uix-hb-service-homebridge-startup.json
+
 # [Optional] Uncomment this section to install additional OS packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 #     && apt-get -y install --no-install-recommends <your-package-list-here>
