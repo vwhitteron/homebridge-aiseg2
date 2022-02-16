@@ -108,6 +108,12 @@ export class LightingAccessory {
       if (err) {
         this.platform.log.info(err);
       }
+
+      if (res.status !== 200) {
+        this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
+
       const deviceInfo = JSON.parse(data);
 
       if (deviceInfo.panelData[0].state === 'on') {
@@ -155,6 +161,11 @@ export class LightingAccessory {
         this.platform.log.info(err);
       }
 
+      if (res.status !== 200) {
+        this.platform.log.info(`HTTP get failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
+
       const $ = LoadHtml(data);
 
       this.States.Token = $('#main').attr('token') || '';
@@ -182,6 +193,11 @@ export class LightingAccessory {
       const responseHandler = (err, data, res) => {
         if (err) {
           this.platform.log.info(err);
+        }
+
+        if (res.status !== 200) {
+          this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+          return;
         }
 
         const response = JSON.parse(data);
@@ -250,6 +266,14 @@ export class LightingAccessory {
     this.States.BlockUpdate = 10;
 
     const responseHandler = (err, data, res) => {
+      if (err) {
+        this.platform.log.info(err);
+      }
+
+      if (res.status !== 200) {
+        this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
 
       this.platform.log.debug(`Response: '${data}'`);
 
@@ -314,6 +338,11 @@ export class LightingAccessory {
     const responseHandler = (err, data, res) => {
       if (err) {
         this.platform.log.info(err);
+      }
+
+      if (res.status !== 200) {
+        this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+        return;
       }
 
       const response = JSON.parse(data);
