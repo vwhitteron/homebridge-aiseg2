@@ -242,6 +242,10 @@ export class LightingAccessory {
 
   // Handle set on requests from HomeKit
   async setOn(value: CharacteristicValue) {
+    const deviceData = this.accessory.context.device;
+    const timestamp = Date.now();
+    this.platform.log.info(`${timestamp} - ${deviceData.displayName} received setOn with value ${value ? 'ON' : 'OFF'}`);
+
     if (value === this.States.On) {
       return;
     }
@@ -249,8 +253,6 @@ export class LightingAccessory {
     const onOff = (value === true)
       ? LightState.On
       : LightState.Off;
-
-    const deviceData = this.accessory.context.device;
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
     const payload = `data={\
@@ -326,6 +328,8 @@ export class LightingAccessory {
   // Handle set brightness requests from HomeKit
   async setBrightness(value: CharacteristicValue) {
     const deviceData = this.accessory.context.device;
+    const timestamp = Date.now();
+    this.platform.log.info(`${timestamp} - ${deviceData.displayName} received setBrightness with value ${value}`);
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
     const payload = `data={\
