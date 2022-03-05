@@ -295,6 +295,11 @@ export class LightingAccessory {
       }
     };
 
+    // Delay power on action in case it is immediately followed by a brightness command
+    if (onOff === LightState.On) {
+      await delay(50);
+    }
+
     this.platform.log.debug(`Updating device '${deviceData.displayName}' state with ${url}`);
     HttpRequest(url, {
       method: 'POST',
@@ -377,4 +382,8 @@ export class LightingAccessory {
       data: payload,
     }, responseHandler);
   }
+}
+
+function delay(ms: number) {
+  return new Promise( resolve => setTimeout(resolve, ms) );
 }
