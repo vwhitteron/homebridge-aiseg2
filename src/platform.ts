@@ -71,6 +71,11 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
         this.log.info(err);
       }
 
+      if (res.status !== 200) {
+        this.log.info(`HTTP get failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
+
       const $ = LoadHtml(data);
       $('.panel').each((index, element) => {
         const deviceData: LightingDevice = {
@@ -106,6 +111,12 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       if (err) {
         this.log.info(err);
       }
+
+      if (res.status !== 200) {
+        this.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
+
       const deviceInfo = JSON.parse(data);
       this.log.debug(`Device info: ${data}`);
       deviceData.state = deviceInfo.panelData[0].state;
