@@ -34,7 +34,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Discover the various AiSEG2 device types that are compatible with Homekit
   discoverDevices() {
-    for (let i = 1; i <= 2; i++) {
+    for (let i = 1; i <= 1; i++) {
       this.discoverLighting(i);
     }
   }
