@@ -5,6 +5,7 @@ import { load as LoadHtml } from 'cheerio';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { LightingDevice, LightingAccessory } from './lightingAccessory';
+import { triggerAsyncId } from 'async_hooks';
 
 
 export class Aiseg2Platform implements DynamicPlatformPlugin {
@@ -33,7 +34,9 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Discover the various AiSEG2 device types that are compatible with Homekit
   discoverDevices() {
-    this.discoverLighting();
+    for (let i = 0; i <= 4; i++) {
+      this.discoverLighting(i);
+    }
   }
 
   provisionDevice(device: LightingDevice) {
@@ -63,8 +66,8 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
   }
 
   // Fetch all lighting devices from the AiSEG2 controller
-  discoverLighting() {
-    const url = `http://${this.config.host}/page/devices/device/32i1?page=1`;
+  discoverLighting(page: number) {
+    const url = `http://${this.config.host}/page/devices/device/32i1?page=${page}`;
 
     const responseHandler = (err, data, res) => {
       if (err) {
