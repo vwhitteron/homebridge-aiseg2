@@ -34,7 +34,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Discover the various AiSEG2 device types that are compatible with Homekit
   discoverDevices() {
-    for (let i = 0; i <= 4; i++) {
+    for (let i = 1; i <= 1; i++) {
       this.discoverLighting(i);
     }
   }
@@ -67,7 +67,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Fetch all lighting devices from the AiSEG2 controller
   discoverLighting(page: number) {
-    const url = `http://${this.config.host}/page/devices/device/32i1?page=${page}`;
+    const url = `http://${this.config.host}/page/devices/device/32i1?individual_page=${page}`;
 
     const responseHandler = (err, data, res) => {
       if (err) {
