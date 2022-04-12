@@ -2,7 +2,7 @@
   "private": true,
   "displayName": "Homebridge AiSEG2",
   "name": "homebridge-aiseg2",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Panasonic AiSEG2 plugin for Homebridge.",
   "license": "Apache-2.0",
   "repository": {

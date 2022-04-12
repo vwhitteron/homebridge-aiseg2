@@ -13,16 +13,27 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
   public readonly accessories: PlatformAccessory[] = [];
+  public Token: string;
 
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
+    this.Token = '';
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
+
+      // Get a control token from the AiSEG2 controller
+      this.updateControlToken();
+
+      // Refresh the control token every 15 seconds
+      setInterval(() => {
+        this.updateControlToken();
+      }, 60000);
+
       this.discoverDevices();
     });
   }
@@ -32,9 +43,37 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     this.accessories.push(accessory);
   }
 
+  // Fetch the latest token to use for AiSEG2 device action requests
+  updateControlToken() {
+    const url = `http://${this.config.host}/page/devices/device/32i1?page=1`;
+
+    const responseHandler = (err, data, res) => {
+      if (err) {
+        this.log.info(err);
+      }
+
+      if (res.status !== 200) {
+        this.log.info(`HTTP get failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
+
+      const $ = LoadHtml(data);
+
+      this.Token = $('#main').attr('token') || '';
+      this.log.debug(`Retrieved control token '${this.Token}'`);
+    };
+
+    this.log.debug(`Fetching control token from ${url}`);
+    HttpRequest(url, {
+      method: 'GET',
+      rejectUnauthorized: false,
+      digestAuth: `aiseg:${this.config.password}`,
+    }, responseHandler);
+  }
+
   // Discover the various AiSEG2 device types that are compatible with Homekit
   discoverDevices() {
-    for (let i = 1; i <= 1; i++) {
+    for (let i = 1; i <= 4; i++) {
       this.discoverLighting(i);
     }
   }
@@ -136,6 +175,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     };
 
     this.log.debug(`Fetching lighting device details at ${url}`);
+    this.log.debug(`Payload: ${payload}`);
     HttpRequest(url, {
       method: 'POST',
       rejectUnauthorized: false,

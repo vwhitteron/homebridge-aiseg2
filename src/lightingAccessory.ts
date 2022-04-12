@@ -37,7 +37,6 @@ export class LightingAccessory {
   private States = {
     On: false,
     Brightness: 100,
-    Token: '',
     BlockUpdate: 0,
   };
 
@@ -75,18 +74,16 @@ export class LightingAccessory {
         minStep: 20,
       });
 
-    // Get a control token from the AiSEG2 controller
-    this.updateControlToken();
-
-    // Refresh the control token every 15 seconds
-    setInterval(() => {
-      this.updateControlToken();
-    }, 15000);
-
-    // Update lighting accessory characteristics values asynchronously
+    /*
+    // Update lighting accessory characteristics values asynchronously\
     setInterval(() => {
       this.updateLightingState();
-    }, 1000);
+    }, this.randomInt(10, 50) * 100);
+    */
+  }
+
+  randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
   // Fetch the current state of an AiSEG2 lighting device
@@ -149,34 +146,6 @@ export class LightingAccessory {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       data: payload,
-    }, responseHandler);
-  }
-
-  // Fetch the latest token to use for AiSEG2 device action requests
-  updateControlToken() {
-    const url = `http://${this.platform.config.host}/page/devices/device/32i1?page=1`;
-
-    const responseHandler = (err, data, res) => {
-      if (err) {
-        this.platform.log.info(err);
-      }
-
-      if (res.status !== 200) {
-        this.platform.log.info(`HTTP get failed with status ${res.status}: ${res.statusMessage}`);
-        return;
-      }
-
-      const $ = LoadHtml(data);
-
-      this.States.Token = $('#main').attr('token') || '';
-      this.platform.log.debug(`Retrieved control token '${this.States.Token}'`);
-    };
-
-    this.platform.log.debug(`Fetching control token from ${url}`);
-    HttpRequest(url, {
-      method: 'GET',
-      rejectUnauthorized: false,
-      digestAuth: `aiseg:${this.platform.config.password}`,
     }, responseHandler);
   }
 
@@ -256,7 +225,7 @@ export class LightingAccessory {
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
     const payload = `data={\
-                      "token":"${this.States.Token}",\
+                      "token":"${this.platform.Token}",\
                       "nodeId":"${deviceData.nodeId}",\
                       "eoj":"${deviceData.eoj}",\
                       "type":"${deviceData.type}",\
@@ -333,7 +302,7 @@ export class LightingAccessory {
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
     const payload = `data={\
-                      "token":"${this.States.Token}",\
+                      "token":"${this.platform.Token}",\
                       "nodeId":"${deviceData.nodeId}",\
                       "eoj":"${deviceData.eoj}",\
                       "type":"${deviceData.type}",\
