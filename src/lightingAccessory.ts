@@ -1,13 +1,17 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { request as HttpRequest } from 'urllib';
-import { load as LoadHtml } from 'cheerio';
 
 import { Aiseg2Platform } from './platform';
+import { delay } from './utils';
 
 
 export interface LightingDevice {
     displayName: string;
+    manufacturer: string;
+    model: string;
+    serialNumber: string;
+    firmwareRevision: string;
     nodeId: string;
     eoj: string;
     type: string;
@@ -47,9 +51,10 @@ export class LightingAccessory {
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Panasonic')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, accessory.context.device.manufacturer)
+      .setCharacteristic(this.platform.Characteristic.Model, accessory.context.device.model)
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.serialNumber);
+    // .setCharacteristic(this.platform.Characteristic.FirmwareRevision, accessory.context.device.FirmwareRevision);
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
@@ -62,28 +67,26 @@ export class LightingAccessory {
       .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
       .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
+    if (accessory.context.device.dimmable === true) {
+      // register handlers for the Brightness Characteristic
+      this.service.getCharacteristic(this.platform.Characteristic.Brightness)
+        .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
 
-    // set brightness properties for the lightbulb device
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .setProps({
-        minValue: 0,
-        maxValue: 100,
-        minStep: 20,
-      });
+      // set brightness properties for the lightbulb device
+      this.service.getCharacteristic(this.platform.Characteristic.Brightness)
+        .setProps({
+          minValue: 0,
+          maxValue: 100,
+          minStep: 20,
+        });
+    }
 
     /*
     // Update lighting accessory characteristics values asynchronously\
     setInterval(() => {
       this.updateLightingState();
-    }, this.randomInt(10, 50) * 100);
+    }, 1000);
     */
-  }
-
-  randomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
   // Fetch the current state of an AiSEG2 lighting device
@@ -288,7 +291,7 @@ export class LightingAccessory {
   async getOn(): Promise<CharacteristicValue> {
     const deviceData = this.accessory.context.device;
 
-    this.platform.log.debug(`Requested state for ${deviceData.displayName} is ${this.States.On ? 'ON' : 'OFF'}`);
+    this.platform.log.debug(`GetOn(${deviceData.displayName}) <- ${this.States.On ? 'ON' : 'OFF'}`);
     this.service.updateCharacteristic(this.platform.Characteristic.On, this.States.On);
 
     return this.States.On;
@@ -355,8 +358,4 @@ export class LightingAccessory {
       data: payload,
     }, responseHandler);
   }
-}
-
-function delay(ms: number) {
-  return new Promise( resolve => setTimeout(resolve, ms) );
 }
