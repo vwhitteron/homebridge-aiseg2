@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { request as HttpRequest } from 'urllib';
@@ -52,8 +53,13 @@ export class LightingAccessory {
       .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.serialNumber);
     // .setCharacteristic(this.platform.Characteristic.FirmwareRevision, accessory.context.device.FirmwareRevision);
 
+    const isDimmable = accessory.context.device.dimmable;
+    const serviceType = isDimmable === true
+      ? this.platform.Service.Lightbulb
+      : this.platform.Service.Switch;
+
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
+    this.service = this.accessory.getService(serviceType) || this.accessory.addService(serviceType);
 
     // set the service name for display as the default name in the Home app
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.displayName);
@@ -63,7 +69,7 @@ export class LightingAccessory {
       .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
       .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
 
-    if (accessory.context.device.dimmable === true) {
+    if (isDimmable === true) {
       this.platform.log.debug(`Adding brightness props to ${accessory.context.device.displayName}`);
       // register handlers for the Brightness Characteristic
       this.service.getCharacteristic(this.platform.Characteristic.Brightness)
@@ -76,10 +82,6 @@ export class LightingAccessory {
           maxValue: 100,
           minStep: 20,
         });
-    } else {
-      // disable brightness properties for the lightbulb device
-      this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-        .setProps({});
     }
   }
 
