@@ -1,4 +1,4 @@
-import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic, StreamingRequest } from 'homebridge';
+import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic, AccessoryEventTypes } from 'homebridge';
 
 import { request as HttpRequest } from 'urllib';
 import { load as LoadHtml } from 'cheerio';
@@ -9,7 +9,7 @@ import * as deviceInfo from './deviceInfo';
 import { deviceIdToHex, hexToString } from './utils';
 
 
-export interface Aiseg2Device {
+export interface Aiseg2Node {
   nodeId: string;
   eoj: string;
   type: string;
@@ -17,12 +17,17 @@ export interface Aiseg2Device {
   deviceId: string;
 }
 
+// interface AccessoryRecord {
+//   accessory?: LightingAccessory;
+//   aiseg2: LightingDevice;
+// }
+
 export class Aiseg2Platform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
   public readonly accessories: PlatformAccessory[] = [];
-  public devices: { [nodeId: string]: LightingDevice } = {};
+  public devices: { [nodeId: string]: LightingAccessory } = {};
   public Token: string;
 
   constructor(
@@ -47,7 +52,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       // Refresh all device states often
       setInterval(() => {
         this.updateDeviceStates();
-      }, 2000);
+      }, 1000);
 
       this.discoverDevices();
     });
@@ -88,7 +93,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Discover the various AiSEG2 device types that are compatible with Homekit
   discoverDevices() {
-    this.devices = this.discoverWirelessDevices();
+    this.discoverWirelessDevices();
   }
 
   provisionDevice(device: LightingDevice) {
@@ -96,13 +101,13 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
     if (existingAccessory) {
-      this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+      this.log.info('Restoring cached accessory:', existingAccessory.displayName);
 
       // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
       // existingAccessory.context.device = device;
       // this.api.updatePlatformAccessories([existingAccessory]);
 
-      new LightingAccessory(this, existingAccessory);
+      this.devices[device.nodeId] = new LightingAccessory(this, existingAccessory);
 
       // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
       // remove platform accessories when no longer present
@@ -112,7 +117,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       this.log.info('Adding new accessory:', device.displayName);
       const accessory = new this.api.platformAccessory(device.displayName, uuid);
       accessory.context.device = device;
-      new LightingAccessory(this, accessory);
+      this.devices[device.nodeId] = new LightingAccessory(this, accessory);
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
     }
   }
@@ -167,9 +172,12 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
             state: 'off',
           };
 
-          let status = ' (ignored)';
+          if (deviceData.dimmable === true) {
+            deviceData.brightness = 0;
+          }
 
           // Only provision switch devices for now
+          let status = ' (ignored)';
           if (device['devType'] === '0x92') {
             devData[device['nodeId']] = deviceData;
             status = '';
@@ -217,8 +225,71 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     }, responseHandler);
   }
 
-  // Get device version information
-  /*
+  // Provision a lighting device in Homebridge
+  provisionLightingDevices(deviceData: { [nodeId: string]: LightingDevice }) {
+    for (const [, device] of Object.entries(deviceData)) {
+      this.provisionDevice(device);
+    }
+  }
+
+  // Fetch the current state of all AiSEG2 devices
+  updateDeviceStates() {
+    const url = `http://${this.config.host}/data/devices/device/32i1/auto_update`;
+
+    const payloadDevices: Aiseg2Node[] = [];
+
+    for (const [, accessory] of Object.entries(this.devices)) {
+      const device = accessory.getDeviceContext();
+      payloadDevices.push({
+        nodeId: device.nodeId,
+        eoj: device.eoj,
+        type: device.type,
+        nodeIdentNum: device.nodeIdentNum,
+        deviceId: device.deviceId,
+      });
+    }
+
+    const payload = `data={"page":"1","list":${JSON.stringify(payloadDevices)}}`;
+
+    const responseHandler = (err, data, res) => {
+      if (err) {
+        this.log.info(err);
+      }
+
+      if (res.status !== 200) {
+        this.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+        return;
+      }
+
+      const deviceInfo = JSON.parse(data);
+
+      for (const device of deviceInfo.panelData) {
+        const accessory = this.devices[device.nodeId];
+        const deviceData = accessory.getDeviceContext();
+
+        deviceData.state = device.state;
+        if (deviceData.dimmable) {
+          deviceData.brightness = device.modulate_level * 20;
+        }
+        accessory.updateLightingState(deviceData);
+      }
+    };
+
+    HttpRequest(url, {
+      method: 'POST',
+      rejectUnauthorized: false,
+      digestAuth: `aiseg:${this.config.password}`,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      data: payload,
+    }, responseHandler);
+  }
+}
+
+// Get device version information
+/*
   getVersionInfo() {
     const url = `http://${this.config.host}/page/setting/installation/7315`;
 
@@ -258,129 +329,3 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     }, responseHandler);
   }
   */
-
-  // Provision a lighting device in Homebridge
-  provisionLightingDevices(deviceData: { [nodeId: string]: LightingDevice }) {
-    const url = `http://${this.config.host}/data/devices/device/32i1/auto_update`;
-
-    const payloadDevices: Aiseg2Device[] = [];
-    for (const [_, device] of Object.entries(deviceData)) {
-      this.log.info(JSON.stringify(device));
-      payloadDevices.push({
-        nodeId: device.nodeId,
-        eoj: device.eoj,
-        type: device.type,
-        nodeIdentNum: device.nodeIdentNum,
-        deviceId: device.deviceId,
-      });
-    }
-    const payload = `data={"page":"1","list":${JSON.stringify(payloadDevices)}}`;
-
-    const responseHandler = (err, data, res) => {
-      if (err) {
-        this.log.info(err);
-      }
-
-      if (res.status !== 200) {
-        this.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
-        return;
-      }
-
-      const aiseg2Data = JSON.parse(data);
-      this.log.debug(`Device info: ${data}`);
-      for (const aiseg2Device of aiseg2Data.panelData) {
-        const homebridgeDevice = deviceData[aiseg2Device.nodeId];
-        if (aiseg2Device.modulate_hidden !== 'hidden') {
-          homebridgeDevice.brightness = aiseg2Device.modulate_level * 20;
-        }
-
-        this.log.debug(`Device data: ${JSON.stringify(homebridgeDevice)}`);
-
-        this.provisionDevice(homebridgeDevice);
-      }
-    };
-
-    this.log.debug(`Fetching lighting device details at ${url}`);
-    this.log.debug(`Payload: ${payload}`);
-    HttpRequest(url, {
-      method: 'POST',
-      rejectUnauthorized: false,
-      digestAuth: `aiseg:${this.config.password}`,
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      data: payload,
-    }, responseHandler);
-  }
-
-  // Fetch the current state of all AiSEG2 devices
-  updateDeviceStates() {
-    const url = `http://${this.config.host}/data/devices/device/32i1/auto_update`;
-
-    const payloadDevices: Aiseg2Device[] = [];
-
-    for (const [_, device] of Object.entries(this.devices)) {
-      payloadDevices.push({
-        nodeId: device.nodeId,
-        eoj: device.eoj,
-        type: device.type,
-        nodeIdentNum: device.nodeIdentNum,
-        deviceId: device.deviceId,
-      });
-    }
-
-    const payload = `data={"page":"1","list":${JSON.stringify(payloadDevices)}}`;
-
-    const responseHandler = (err, data, res) => {
-      if (err) {
-        this.log.info(err);
-      }
-
-      if (res.status !== 200) {
-        this.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
-        return;
-      }
-
-      const deviceInfo = JSON.parse(data);
-
-      for (const device of deviceInfo.panelData) {
-        const deviceState = this.devices[device.nodeId];
-
-        if (device.state === 'on') {
-          if (deviceState.state === 'off') {
-            deviceState.state = 'on';
-            this.log.info(`${deviceState.displayName} state changed to ON`);
-          }
-          //this.service.updateCharacteristic(this.platform.Characteristic.On, true);
-        } else {
-          if (deviceState.state === 'on') {
-            deviceState.state = 'off';
-            this.log.info(`${deviceState.displayName} state changed to OFF`);
-          }
-          //this.service.updateCharacteristic(this.platform.Characteristic.On, false);
-        }
-        if (device.modulate_hidden !== 'hidden') {
-          const brightnessLevel = device.modulate_level * 20;
-          if (brightnessLevel !== deviceState.brightness) {
-            deviceState.brightness = brightnessLevel;
-            this.log.info(`${deviceState.displayName} brightness changed to ${brightnessLevel}%`);
-          }
-          //this.service.updateCharacteristic(this.platform.Characteristic.Brightness,
-          //  this.States.Brightness);
-        }
-      }
-    };
-
-    HttpRequest(url, {
-      method: 'POST',
-      rejectUnauthorized: false,
-      digestAuth: `aiseg:${this.config.password}`,
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      data: payload,
-    }, responseHandler);
-  }
-}

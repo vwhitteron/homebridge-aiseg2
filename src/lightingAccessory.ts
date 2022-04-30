@@ -2,25 +2,21 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { request as HttpRequest } from 'urllib';
 
-import { Aiseg2Platform } from './platform';
+import { Aiseg2Platform, Aiseg2Node } from './platform';
 import { delay } from './utils';
 
 
-export interface LightingDevice {
+export interface LightingDevice extends Aiseg2Node {
     displayName: string;
     manufacturer: string;
     model: string;
     serialNumber: string;
     firmwareRevision: string;
-    nodeId: string;
-    eoj: string;
-    type: string;
-    nodeIdentNum: string;
-    deviceId: string;
     disable?: string;
     state?: string;
     dimmable?: boolean;
     brightness?: number;
+    accessory?: LightingAccessory;
 }
 
 enum CheckResult {
@@ -68,6 +64,7 @@ export class LightingAccessory {
       .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
 
     if (accessory.context.device.dimmable === true) {
+      this.platform.log.debug(`Adding brightness props to ${accessory.context.device.displayName}`);
       // register handlers for the Brightness Characteristic
       this.service.getCharacteristic(this.platform.Characteristic.Brightness)
         .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
@@ -79,77 +76,46 @@ export class LightingAccessory {
           maxValue: 100,
           minStep: 20,
         });
+    } else {
+      // disable brightness properties for the lightbulb device
+      this.service.getCharacteristic(this.platform.Characteristic.Brightness)
+        .setProps({});
     }
+  }
 
-    /*
-    // Update lighting accessory characteristics values asynchronously\
-    setInterval(() => {
-      this.updateLightingState();
-    }, 1000);
-    */
+  // Returns the LightingDevice data from within the accessory context
+  getDeviceContext(): LightingDevice {
+    //this.platform.log.info(`Context: ${JSON.stringify(this.accessory.context)}`);
+    return this.accessory.context.device;
   }
 
   // Fetch the current state of an AiSEG2 lighting device
-  updateLightingState() {
+  updateLightingState(deviceData: LightingDevice) {
     if (this.States.BlockUpdate >= 1) {
       this.States.BlockUpdate--;
       return;
     }
 
-    const url = `http://${this.platform.config.host}/data/devices/device/32i1/auto_update`;
-    const deviceData = this.accessory.context.device;
-    delete deviceData.disable;
-    delete deviceData.state;
-    delete deviceData.dimmable;
-    delete deviceData.brightness;
-    const payload = `data={"page":"1","list":[${JSON.stringify(deviceData)}]}`;
+    const currentState = this.service.getCharacteristic(this.platform.Characteristic.On).value ? 'on' : 'off';
+    if (deviceData.state !== currentState ) {
+      const updateState = deviceData.state === 'on' ? true : false;
 
-    const responseHandler = (err, data, res) => {
-      if (err) {
-        this.platform.log.info(err);
-      }
+      this.platform.log.info(`AiSEG2 -> ${deviceData.displayName} state set to ${deviceData.state?.toUpperCase()}`);
 
-      if (res.status !== 200) {
-        this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
-        return;
-      }
+      this.service.updateCharacteristic(this.platform.Characteristic.On, updateState);
+      //this.service.getCharacteristic(this.platform.Characteristic.On).updateValue(updateState);
+      this.accessory.context.device.state = deviceData.state;
+    }
 
-      const deviceInfo = JSON.parse(data);
+    const currentBrightness = this.service.getCharacteristic(this.platform.Characteristic.Brightness).value;
+    if (deviceData.brightness && deviceData.brightness !== currentBrightness) {
 
-      if (deviceInfo.panelData[0].state === 'on') {
-        if (this.States.On === false) {
-          this.States.On = true;
-          this.platform.log.info(`${deviceData.displayName} state changed to ON`);
-        }
-        this.service.updateCharacteristic(this.platform.Characteristic.On, true);
-      } else {
-        if (this.States.On === true) {
-          this.States.On = false;
-          this.platform.log.info(`${deviceData.displayName} state changed to OFF`);
-        }
-        this.service.updateCharacteristic(this.platform.Characteristic.On, false);
-      }
-      if (deviceInfo.panelData[0].modulate_hidden !== 'hidden') {
-        const brightnessLevel = deviceInfo.panelData[0].modulate_level * 20;
-        if (brightnessLevel !== this.States.Brightness) {
-          this.States.Brightness = brightnessLevel;
-          this.platform.log.info(`${deviceData.displayName} brightness changed to ${this.States.Brightness}%`);
-        }
-        this.service.updateCharacteristic(this.platform.Characteristic.Brightness,
-          this.States.Brightness);
-      }
-    };
+      this.platform.log.info(`AiSEG2 -> ${deviceData.displayName} brightness set to ${deviceData.brightness}`);
 
-    HttpRequest(url, {
-      method: 'POST',
-      rejectUnauthorized: false,
-      digestAuth: `aiseg:${this.platform.config.password}`,
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      data: payload,
-    }, responseHandler);
+      this.service.updateCharacteristic(this.platform.Characteristic.Brightness, deviceData.brightness);
+      //this.service.getCharacteristic(this.platform.Characteristic.Brightness).updateValue(deviceData.brightness);
+      this.accessory.context.device.brightness = deviceData.brightness;
+    }
   }
 
   // Poll for the execution status of an async AiSEG2 change request
@@ -216,15 +182,14 @@ export class LightingAccessory {
   async setOn(value: CharacteristicValue) {
     const deviceData = this.accessory.context.device;
     const timestamp = Date.now();
-    this.platform.log.info(`${timestamp} - ${deviceData.displayName} received setOn with value ${value ? 'ON' : 'OFF'}`);
+    this.platform.log.debug(`setOn -> ${deviceData.displayName} to ${value ? 'ON' : 'OFF'}`);
 
-    if (value === this.States.On) {
+    const currentState = this.service.getCharacteristic(this.platform.Characteristic.On).value || false;
+    if (value === currentState) {
       return;
     }
 
-    const onOff = (value === true)
-      ? LightState.On
-      : LightState.Off;
+    const onOff = value ? LightState.On : LightState.Off;
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
     const payload = `data={\
@@ -237,7 +202,7 @@ export class LightingAccessory {
                         "modulate":"-"}\
                       }`.replace(/\s+/g, '');
 
-    this.States.BlockUpdate = 10;
+    this.States.BlockUpdate = 2;
 
     const responseHandler = (err, data, res) => {
       if (err) {
@@ -260,10 +225,11 @@ export class LightingAccessory {
       if (result === true) {
         this.service.updateCharacteristic(this.platform.Characteristic.On, value);
 
-        this.States.On = value as boolean;
+        // this.States.On = value as boolean;
+        this.accessory.context.device.state = value ? 'on' : 'off';
         this.States.BlockUpdate = 2;
 
-        this.platform.log.info(`${deviceData.displayName} switched ${value ? 'ON' : 'OFF'}`);
+        this.platform.log.info(`Homebridge -> ${deviceData.displayName} state set to ${value ? 'ON' : 'OFF'}`);
       } else {
         this.platform.log.error(`${deviceData.displayName} update submission failed: ${JSON.stringify(data)}`);
       }
@@ -289,19 +255,18 @@ export class LightingAccessory {
 
   // Handle get on requests from HomeKit
   async getOn(): Promise<CharacteristicValue> {
-    const deviceData = this.accessory.context.device;
+    const state = this.service.getCharacteristic(this.platform.Characteristic.On).value || false;
 
-    this.platform.log.debug(`GetOn(${deviceData.displayName}) <- ${this.States.On ? 'ON' : 'OFF'}`);
-    this.service.updateCharacteristic(this.platform.Characteristic.On, this.States.On);
+    this.platform.log.debug(`GetOn(${this.accessory.context.device.displayName}) <- ${state ? 'ON' : 'OFF'}`);
 
-    return this.States.On;
+    return state;
   }
 
   // Handle set brightness requests from HomeKit
   async setBrightness(value: CharacteristicValue) {
     const deviceData = this.accessory.context.device;
     const timestamp = Date.now();
-    this.platform.log.info(`${timestamp} - ${deviceData.displayName} received setBrightness with value ${value}`);
+    this.platform.log.info(`setBrightness -> ${deviceData.displayName} to ${value}`);
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
     const payload = `data={\
@@ -340,7 +305,7 @@ export class LightingAccessory {
         this.States.Brightness = value as number;
         this.States.BlockUpdate = 2;
 
-        this.platform.log.info(`${deviceData.displayName} brightness set to ${value}%`);
+        this.platform.log.info(`Homebridge -> ${deviceData.displayName} brightness set to ${value}%`);
       } else {
         this.platform.log.error(`${deviceData.displayName} brightness update failed`);
       }
