@@ -96,7 +96,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     this.discoverWirelessDevices();
   }
 
-  provisionDevice(device: LightingDevice) {
+  provisionDevice(devId: string, device: LightingDevice) {
     const uuid = this.api.hap.uuid.generate(device.deviceId);
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
@@ -107,7 +107,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       // existingAccessory.context.device = device;
       // this.api.updatePlatformAccessories([existingAccessory]);
 
-      this.devices[device.nodeId] = new LightingAccessory(this, existingAccessory);
+      this.devices[devId] = new LightingAccessory(this, existingAccessory);
 
       // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
       // remove platform accessories when no longer present
@@ -117,7 +117,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       this.log.info('Adding new accessory:', device.displayName);
       const accessory = new this.api.platformAccessory(device.displayName, uuid);
       accessory.context.device = device;
-      this.devices[device.nodeId] = new LightingAccessory(this, accessory);
+      this.devices[devId] = new LightingAccessory(this, accessory);
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
     }
   }
@@ -151,7 +151,9 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
 
         for (const device of devices) {
+          // Only provision switch devices for now
           if (device['devType'] !== '0x92') {
+            this.log.debug(`Ignoring non-light device ${device['devName']}`);
             continue;
           }
 
@@ -176,15 +178,11 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
             deviceData.brightness = 0;
           }
 
-          // Only provision switch devices for now
-          let status = ' (ignored)';
-          if (device['devType'] === '0x92') {
-            devData[device['nodeId']] = deviceData;
-            status = '';
-          }
+          const devId = device['nodeId'] + device['eoj'];
+          devData[devId] = deviceData;
 
           const devType = device['devType'];
-          this.log.info(`Discovered ${deviceInfo.types[devType]} device '${deviceData.displayName}'${status}`);
+          this.log.info(`Discovered ${deviceInfo.types[devType]} device '${deviceData.displayName}'`);
           this.log.debug(JSON.stringify(deviceData));
         }
 
@@ -227,8 +225,8 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Provision a lighting device in Homebridge
   provisionLightingDevices(deviceData: { [nodeId: string]: LightingDevice }) {
-    for (const [, device] of Object.entries(deviceData)) {
-      this.provisionDevice(device);
+    for (const [devId, device] of Object.entries(deviceData)) {
+      this.provisionDevice(devId, device);
     }
   }
 
@@ -264,7 +262,8 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       const deviceInfo = JSON.parse(data);
 
       for (const device of deviceInfo.panelData) {
-        const accessory = this.devices[device.nodeId];
+        const devId = device.nodeId + device.eoj;
+        const accessory = this.devices[devId];
         const deviceData = accessory.getDeviceContext();
 
         deviceData.state = device.state;
