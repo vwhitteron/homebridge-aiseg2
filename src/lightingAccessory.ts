@@ -109,14 +109,15 @@ export class LightingAccessory {
       this.accessory.context.device.state = deviceData.state;
     }
 
-    const currentBrightness = this.service.getCharacteristic(this.platform.Characteristic.Brightness).value;
-    if (deviceData.brightness && deviceData.brightness !== currentBrightness) {
+    if (deviceData.dimmable === true) {
+      const currentBrightness = this.service.getCharacteristic(this.platform.Characteristic.Brightness).value;
+      if (deviceData.brightness !== currentBrightness) {
+        this.platform.log.info(`AiSEG2 -> ${deviceData.displayName} brightness set to ${deviceData.brightness}`);
 
-      this.platform.log.info(`AiSEG2 -> ${deviceData.displayName} brightness set to ${deviceData.brightness}`);
-
-      this.service.updateCharacteristic(this.platform.Characteristic.Brightness, deviceData.brightness);
-      //this.service.getCharacteristic(this.platform.Characteristic.Brightness).updateValue(deviceData.brightness);
-      this.accessory.context.device.brightness = deviceData.brightness;
+        this.service.updateCharacteristic(this.platform.Characteristic.Brightness, deviceData.brightness || 0);
+        //this.service.getCharacteristic(this.platform.Characteristic.Brightness).updateValue(deviceData.brightness);
+        this.accessory.context.device.brightness = deviceData.brightness;
+      }
     }
   }
 
