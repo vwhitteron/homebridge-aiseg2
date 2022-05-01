@@ -34,12 +34,8 @@ enum LightState {
 export class LightingAccessory {
   private service: Service;
 
-  // Accessory state tracking data
-  private States = {
-    On: false,
-    Brightness: 100,
-    BlockUpdate: 0,
-  };
+  // countdown timer to block state updates
+  private blockUpdate = 0;
 
   constructor(
     private readonly platform: Aiseg2Platform,
@@ -93,29 +89,37 @@ export class LightingAccessory {
 
   // Fetch the current state of an AiSEG2 lighting device
   updateLightingState(deviceData: LightingDevice) {
-    if (this.States.BlockUpdate >= 1) {
-      this.States.BlockUpdate--;
+    if (this.blockUpdate >= 1) {
+      this.blockUpdate--;
       return;
     }
 
     const currentState = this.service.getCharacteristic(this.platform.Characteristic.On).value ? 'on' : 'off';
-    if (deviceData.state !== currentState ) {
+
+    if (deviceData.state === '') {
+      return;
+    }
+
+    if (deviceData.state !== currentState) {
+
       const updateState = deviceData.state === 'on' ? true : false;
 
       this.platform.log.info(`AiSEG2 -> ${deviceData.displayName} state set to ${deviceData.state?.toUpperCase()}`);
 
       this.service.updateCharacteristic(this.platform.Characteristic.On, updateState);
-      //this.service.getCharacteristic(this.platform.Characteristic.On).updateValue(updateState);
+
       this.accessory.context.device.state = deviceData.state;
     }
 
     if (deviceData.dimmable === true) {
+
       const currentBrightness = this.service.getCharacteristic(this.platform.Characteristic.Brightness).value;
+
       if (deviceData.brightness !== currentBrightness) {
         this.platform.log.info(`AiSEG2 -> ${deviceData.displayName} brightness set to ${deviceData.brightness}`);
 
         this.service.updateCharacteristic(this.platform.Characteristic.Brightness, deviceData.brightness || 0);
-        //this.service.getCharacteristic(this.platform.Characteristic.Brightness).updateValue(deviceData.brightness);
+
         this.accessory.context.device.brightness = deviceData.brightness;
       }
     }
@@ -123,7 +127,7 @@ export class LightingAccessory {
 
   // Poll for the execution status of an async AiSEG2 change request
   checkStatus(acceptId: number) {
-    this.States.BlockUpdate = 10;
+    this.blockUpdate = 10;
 
     const url = `http://${this.platform.config.host}/data/devices/device/32i1/check`;
     const payload = `data={"acceptId":"${acceptId}","type":"0x92"}`;
@@ -177,14 +181,13 @@ export class LightingAccessory {
       }
     }, 500);
 
-    this.States.BlockUpdate = 1;
+    this.blockUpdate = 1;
     return status;
   }
 
   // Handle set on requests from HomeKit
   async setOn(value: CharacteristicValue) {
     const deviceData = this.accessory.context.device;
-    const timestamp = Date.now();
     this.platform.log.debug(`setOn -> ${deviceData.displayName} to ${value ? 'ON' : 'OFF'}`);
 
     const currentState = this.service.getCharacteristic(this.platform.Characteristic.On).value || false;
@@ -205,7 +208,7 @@ export class LightingAccessory {
                         "modulate":"-"}\
                       }`.replace(/\s+/g, '');
 
-    this.States.BlockUpdate = 2;
+    this.blockUpdate = 2;
 
     const responseHandler = (err, data, res) => {
       if (err) {
@@ -228,9 +231,8 @@ export class LightingAccessory {
       if (result === true) {
         this.service.updateCharacteristic(this.platform.Characteristic.On, value);
 
-        // this.States.On = value as boolean;
         this.accessory.context.device.state = value ? 'on' : 'off';
-        this.States.BlockUpdate = 2;
+        this.blockUpdate = 2;
 
         this.platform.log.info(`Homebridge -> ${deviceData.displayName} state set to ${value ? 'ON' : 'OFF'}`);
       } else {
@@ -268,7 +270,7 @@ export class LightingAccessory {
   // Handle set brightness requests from HomeKit
   async setBrightness(value: CharacteristicValue) {
     const deviceData = this.accessory.context.device;
-    const timestamp = Date.now();
+
     this.platform.log.info(`setBrightness -> ${deviceData.displayName} to ${value}`);
 
     const url = `http://${this.platform.config.host}/action/devices/device/32i1/change`;
@@ -282,7 +284,7 @@ export class LightingAccessory {
                         "modulate":"0x${value.toString(16)}"}\
                       }`.replace(/\s+/g, '');
 
-    this.States.BlockUpdate = 10;
+    this.blockUpdate = 10;
 
     const responseHandler = (err, data, res) => {
       if (err) {
@@ -304,9 +306,7 @@ export class LightingAccessory {
         this.service.updateCharacteristic(this.platform.Characteristic.On, 1);
         this.service.updateCharacteristic(this.platform.Characteristic.Brightness, value);
 
-        this.States.On = true;
-        this.States.Brightness = value as number;
-        this.States.BlockUpdate = 2;
+        this.blockUpdate = 2;
 
         this.platform.log.info(`Homebridge -> ${deviceData.displayName} brightness set to ${value}%`);
       } else {

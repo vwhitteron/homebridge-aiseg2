@@ -1,4 +1,4 @@
-import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic, AccessoryEventTypes } from 'homebridge';
+import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { request as HttpRequest } from 'urllib';
 import { load as LoadHtml } from 'cheerio';
@@ -17,18 +17,15 @@ export interface Aiseg2Node {
   deviceId: string;
 }
 
-// interface AccessoryRecord {
-//   accessory?: LightingAccessory;
-//   aiseg2: LightingDevice;
-// }
-
 export class Aiseg2Platform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
   public readonly accessories: PlatformAccessory[] = [];
-  public devices: { [nodeId: string]: LightingAccessory } = {};
+  public devices: { [uid: string]: LightingAccessory } = {};
   public Token: string;
+
+  private backoff: number;
 
   constructor(
     public readonly log: Logger,
@@ -36,6 +33,9 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     public readonly api: API,
   ) {
     this.Token = '';
+
+    this.backoff = 0;
+
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
@@ -52,7 +52,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       // Refresh all device states often
       setInterval(() => {
         this.updateDeviceStates();
-      }, 1000);
+      }, 2500);
 
       this.discoverDevices();
     });
@@ -94,6 +94,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
   // Discover the various AiSEG2 device types that are compatible with Homekit
   discoverDevices() {
     this.discoverWirelessDevices();
+    this.discoverNetworkDevices();
   }
 
   provisionDevice(devId: string, device: LightingDevice) {
@@ -122,10 +123,8 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     }
   }
 
-  discoverWirelessDevices(): { [nodeId: string]: LightingDevice } {
+  discoverWirelessDevices() {
     const url = `http://${this.config.host}/page/setting/installation/7314`;
-
-    const devData: { [nodeId: string]: LightingDevice } = {};
 
     const responseHandler = (err, data, res) => {
       if (err) {
@@ -137,6 +136,8 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
         return;
       }
 
+      const devData: { [nodeId: string]: LightingDevice } = {};
+
       const $ = LoadHtml(data);
       $('script').each((index, element) => {
         const content = $(element).html() || '';
@@ -147,6 +148,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
         if (match) {
           this.log.debug(`Found Wireless device data at script index ${index}: ${content}`);
           devices = JSON.parse(match[1]);
+          this.log.info(typeof(devices));
         }
 
 
@@ -178,8 +180,8 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
             deviceData.brightness = 0;
           }
 
-          const devId = device['nodeId'] + device['eoj'];
-          devData[devId] = deviceData;
+          const deviceUid = this.generateUid(device);
+          devData[deviceUid] = deviceData;
 
           const devType = device['devType'];
           this.log.info(`Discovered ${deviceInfo.types[devType]} device '${deviceData.displayName}'`);
@@ -197,8 +199,6 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       rejectUnauthorized: false,
       digestAuth: `aiseg:${this.config.password}`,
     }, responseHandler);
-
-    return devData;
   }
 
   discoverNetworkDevices() {
@@ -213,6 +213,25 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
         this.log.info(`HTTP get failed with status ${res.status}: ${res.statusMessage}`);
         return;
       }
+
+      //const devData: { [nodeId: string]: LightingDevice } = {};
+
+      const $ = LoadHtml(data);
+      $('script').each((index, element) => {
+        const content = $(element).html() || '';
+        const pattern = /window.onload = function\(\){ init\((.*), \d\); };/;
+
+        let devices = [];
+        const match = content.match(pattern);
+        if (match) {
+          this.log.debug(`Found network device data at script index ${index}: ${content}`);
+          devices = JSON.parse(match[1]);
+        }
+
+        for (const device of devices) {
+          this.log.info(JSON.stringify(device));
+        }
+      });
     };
 
     this.log.debug(`Fetching network devices at ${url}`);
@@ -226,12 +245,20 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
   // Provision a lighting device in Homebridge
   provisionLightingDevices(deviceData: { [nodeId: string]: LightingDevice }) {
     for (const [devId, device] of Object.entries(deviceData)) {
-      this.provisionDevice(devId, device);
+      if (device.type === '0x92') {
+        this.provisionDevice(devId, device);
+      }
     }
   }
 
   // Fetch the current state of all AiSEG2 devices
   updateDeviceStates() {
+    if (this.backoff > 0) {
+      this.log.debug(`Skip device update due to backoff (${this.backoff})`);
+      this.backoff--;
+      return;
+    }
+
     const url = `http://${this.config.host}/data/devices/device/32i1/auto_update`;
 
     const payloadDevices: Aiseg2Node[] = [];
@@ -251,13 +278,17 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
     const responseHandler = (err, data, res) => {
       if (err) {
+        this.backoff += this.backoff <= 25 ? 3 : 0;
         this.log.info(err);
       }
 
       if (res.status !== 200) {
+        this.backoff += this.backoff <= 25 ? 3 : 0;
         this.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
         return;
       }
+
+      this.backoff = 0;
 
       const deviceInfo = JSON.parse(data);
 
@@ -284,6 +315,11 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       },
       data: payload,
     }, responseHandler);
+  }
+
+  // Generate a unique ID for a given Aiseg2Node object
+  generateUid(obj: Aiseg2Node): string {
+    return obj['nodeId'] + obj['eoj'];
   }
 }
 
