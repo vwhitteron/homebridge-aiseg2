@@ -229,7 +229,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
         }
 
         for (const device of devices) {
-          this.log.info(JSON.stringify(device));
+          this.log.debug(JSON.stringify(device));
         }
       });
     };
