@@ -8,16 +8,16 @@ import { delay } from './utils';
 
 
 export interface LightingDevice extends Aiseg2Node {
-    displayName: string;
-    manufacturer: string;
-    model: string;
-    serialNumber: string;
-    firmwareRevision: string;
-    disable?: string;
-    state?: string;
-    dimmable?: boolean;
-    brightness?: number;
-    accessory?: LightingAccessory;
+  displayName: string;
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+  firmwareRevision: string;
+  disable?: string;
+  state?: string;
+  dimmable?: boolean;
+  brightness?: number;
+  accessory?: LightingAccessory;
 }
 
 enum CheckResult {
@@ -126,67 +126,69 @@ export class LightingAccessory {
   }
 
   // Poll for the execution status of an async AiSEG2 change request
-  checkStatus(acceptId: number) {
-    this.blockUpdate = 10;
+  checkStatus(acceptId: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.blockUpdate = 10;
 
-    const url = `http://${this.platform.config.host}/data/devices/device/32i1/check`;
-    const payload = `data={"acceptId":"${acceptId}","type":"0x92"}`;
+      const url = `http://${this.platform.config.host}/data/devices/device/32i1/check`;
+      const payload = `data={"acceptId":"${acceptId}","type":"0x92"}`;
 
-    let status = false;
-    let count = 6;
-    const checkLoop = setInterval(() => {
-      const responseHandler = (err, data, res) => {
-        if (err) {
-          this.platform.log.info(err);
-        }
+      let count = 6;
+      const displayName = this.accessory.context.device.displayName;
 
-        if (res.status !== 200) {
-          this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
-          return;
-        }
+      const poll = () => {
+        this.platform.log.debug(`Polling status of async request ID ${acceptId}`);
+        HttpRequest(url, {
+          method: 'POST',
+          rejectUnauthorized: false,
+          digestAuth: `aiseg:${this.platform.config.password}`,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          data: payload,
+        }, (err, data, res) => {
+          if (err) {
+            this.platform.log.info(err.message);
+          }
 
-        const response = JSON.parse(data);
+          if (res.statusCode !== 200) {
+            this.platform.log.info(`HTTP post failed with status ${res.statusCode}: ${res.statusMessage}`);
+            return;
+          }
 
-        switch (response.result) {
-          case CheckResult.OK:
-            this.platform.log.debug(`Device state change for ${this.accessory.context.device.displayName} completed succesfully`);
-            status = true;
-            clearInterval(checkLoop);
-            break;
-          case CheckResult.InProgress:
-            break;
-          case CheckResult.Invalid:
-            this.platform.log.debug(`Device state change for ${this.accessory.context.device.displayName} is unknown`);
-            status = false;
-            clearInterval(checkLoop);
-            break;
-        }
+          const response = JSON.parse(data);
+
+          switch (response.result) {
+            case CheckResult.OK:
+              this.platform.log.debug(`Device state change for ${displayName} completed successfully`);
+              this.blockUpdate = 1;
+              resolve(true);
+              break;
+            case CheckResult.InProgress:
+              break;
+            case CheckResult.Invalid:
+              this.platform.log.debug(`Device state change for ${displayName} is unknown`);
+              this.blockUpdate = 1;
+              resolve(false);
+              break;
+          }
+
+          count--;
+          if (count === 0) {
+            this.platform.log.error(`Timed out waiting for accessory '${displayName}' to update state`);
+            this.blockUpdate = 1;
+            resolve(false);
+          }
+        });
       };
 
-      this.platform.log.debug(`Polling status of async request ID ${acceptId}`);
-      HttpRequest(url, {
-        method: 'POST',
-        rejectUnauthorized: false,
-        digestAuth: `aiseg:${this.platform.config.password}`,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        data: payload,
-      }, responseHandler);
-      count--;
-      if (count === 0) {
-        this.platform.log.error(`Timed out waiting for accessory '${this.accessory.context.device.displayName}' to update state`);
-        clearInterval(checkLoop);
-      }
-    }, 500);
-
-    this.blockUpdate = 1;
-    return status;
+      poll();
+    });
   }
 
   // Handle set on requests from HomeKit
-  async setOn(value: CharacteristicValue) {
+  async setOn(value: CharacteristicValue): Promise<void> {
     const deviceData = this.accessory.context.device;
     this.platform.log.debug(`setOn -> ${deviceData.displayName} to ${value ? 'ON' : 'OFF'}`);
 
@@ -212,11 +214,12 @@ export class LightingAccessory {
 
     const responseHandler = (err, data, res) => {
       if (err) {
-        this.platform.log.info(err);
+        this.platform.log.info(err.message);
+        return;
       }
 
-      if (res.status !== 200) {
-        this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+      if (res.statusCode !== 200) {
+        this.platform.log.info(`HTTP post failed with status ${res.statusCode}: ${res.statusMessage}`);
         return;
       }
 
@@ -224,26 +227,27 @@ export class LightingAccessory {
 
       const response = JSON.parse(data);
 
-      const result = (Number.isInteger(response.acceptId))
-        ? this.checkStatus(response.acceptId)
-        : true;
-
-      if (result === true) {
+      if (!Number.isInteger(response.acceptId)) {
+        // No acceptId means the command was processed synchronously
         this.service.updateCharacteristic(this.platform.Characteristic.On, value);
-
         this.accessory.context.device.state = value ? 'on' : 'off';
         this.blockUpdate = 2;
-
         this.platform.log.info(`Homebridge -> ${deviceData.displayName} state set to ${value ? 'ON' : 'OFF'}`);
-      } else {
-        this.platform.log.error(`${deviceData.displayName} update submission failed: ${JSON.stringify(data)}`);
+        return;
       }
-    };
 
-    // Delay power on action in case it is immediately followed by a brightness command
-    if (onOff === LightState.On) {
-      await delay(50);
-    }
+      // Wait for async status check
+      this.checkStatus(response.acceptId).then((result) => {
+        if (result) {
+          this.service.updateCharacteristic(this.platform.Characteristic.On, value);
+          this.accessory.context.device.state = value ? 'on' : 'off';
+          this.blockUpdate = 2;
+          this.platform.log.info(`Homebridge -> ${deviceData.displayName} state set to ${value ? 'ON' : 'OFF'}`);
+        } else {
+          this.platform.log.error(`${deviceData.displayName} update submission failed: ${JSON.stringify(data)}`);
+        }
+      });
+    };
 
     this.platform.log.debug(`Updating device '${deviceData.displayName}' state with ${url}`);
     HttpRequest(url, {
@@ -268,7 +272,7 @@ export class LightingAccessory {
   }
 
   // Handle set brightness requests from HomeKit
-  async setBrightness(value: CharacteristicValue) {
+  async setBrightness(value: CharacteristicValue): Promise<void> {
     const deviceData = this.accessory.context.device;
 
     this.platform.log.info(`setBrightness -> ${deviceData.displayName} to ${value}`);
@@ -288,30 +292,37 @@ export class LightingAccessory {
 
     const responseHandler = (err, data, res) => {
       if (err) {
-        this.platform.log.info(err);
+        this.platform.log.info(err.message);
+        return;
       }
 
-      if (res.status !== 200) {
-        this.platform.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
+      if (res.statusCode !== 200) {
+        this.platform.log.info(`HTTP post failed with status ${res.statusCode}: ${res.statusMessage}`);
         return;
       }
 
       const response = JSON.parse(data);
 
-      const result = (Number.isInteger(response.acceptId))
-        ? this.checkStatus(response.acceptId)
-        : true;
-
-      if (result === true) {
+      if (!Number.isInteger(response.acceptId)) {
+        // No acceptId means the command was processed synchronously
         this.service.updateCharacteristic(this.platform.Characteristic.On, 1);
         this.service.updateCharacteristic(this.platform.Characteristic.Brightness, value);
-
         this.blockUpdate = 2;
-
         this.platform.log.info(`Homebridge -> ${deviceData.displayName} brightness set to ${value}%`);
-      } else {
-        this.platform.log.error(`${deviceData.displayName} brightness update failed`);
+        return;
       }
+
+      // Wait for async status check
+      this.checkStatus(response.acceptId).then((result) => {
+        if (result) {
+          this.service.updateCharacteristic(this.platform.Characteristic.On, 1);
+          this.service.updateCharacteristic(this.platform.Characteristic.Brightness, value);
+          this.blockUpdate = 2;
+          this.platform.log.info(`Homebridge -> ${deviceData.displayName} brightness set to ${value}%`);
+        } else {
+          this.platform.log.error(`${deviceData.displayName} brightness update failed`);
+        }
+      });
     };
 
     this.platform.log.debug(`Updating device '${deviceData.displayName}' brightness with ${url}`);

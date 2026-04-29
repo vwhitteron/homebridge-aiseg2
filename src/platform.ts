@@ -39,7 +39,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
     this.log.debug('Finished initializing platform:', this.config.name);
 
     this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
+      this.log.debug('Executed didFinishLaunching callback');
 
       // Get a control token from the AiSEG2 controller
       this.updateControlToken();
@@ -148,7 +148,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
         if (match) {
           this.log.debug(`Found Wireless device data at script index ${index}: ${content}`);
           devices = JSON.parse(match[1]);
-          this.log.info(typeof(devices));
+          this.log.info(typeof (devices));
         }
 
 
@@ -170,7 +170,7 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
             nodeId: device['nodeId'] || '',
             eoj: device['eoj'] || '',
             type: device['devType'] || '',
-            nodeIdentNum: '0x' + device['uniqueNo'] || '',
+            nodeIdentNum: device['uniqueNo'] ? `0x${device['uniqueNo']}` : '',
             deviceId: deviceIdToHex(deviceId) || '',
             dimmable: deviceInfo.switchModels[model]['dimmable'] || false,
             state: 'off',
@@ -278,12 +278,12 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
     const responseHandler = (err, data, res) => {
       if (err) {
-        this.backoff += this.backoff <= 25 ? 3 : 0;
+        this.backoff = Math.min(this.backoff + 3, 25);
         this.log.info(err);
       }
 
       if (res.status !== 200) {
-        this.backoff += this.backoff <= 25 ? 3 : 0;
+        this.backoff = Math.min(this.backoff + 3, 25);
         this.log.info(`HTTP post failed with status ${res.status}: ${res.statusMessage}`);
         return;
       }
