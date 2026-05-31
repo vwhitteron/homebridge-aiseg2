@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
-export const types: { [id: string]: string} = {
+export const types: { [id: string]: string } = {
   '0x25': 'residential solar power generator',
   '0x29': 'circuit breaker board',
   '0x33': 'air conditioner',
@@ -10,49 +8,25 @@ export const types: { [id: string]: string} = {
 };
 
 export type switchCharacteristics = {
-    dimmable: boolean;
-    gangs: number;
+  dimmable: boolean;
 };
 
-export const switchModels: { [id: string]: switchCharacteristics } = {
-  'WTY2201': {
-    dimmable: false,
-    gangs: 1,
-  },
-  'WTY2202': {
-    dimmable: false,
-    gangs: 2,
-  },
-  'WTY2401': {
-    dimmable: false,
-    gangs: 1,
-  },
-  'WTY2402': {
-    dimmable: false,
-    gangs: 2,
-  },
-  'WTY2421': {
-    dimmable: false,
-    gangs: 1,
-  },
-  'WTY2422': {
-    dimmable: false,
-    gangs: 2,
-  },
-  'WTY2530': {
-    dimmable: false,
-    gangs: 6,
-  },
-  'WTY2641': {
-    dimmable: false,
-    gangs: 1,
-  },
-  'WTY22173': {
-    dimmable: true,
-    gangs: 1,
-  },
-  'WTY24173': {
-    dimmable: true,
-    gangs: 1,
-  },
-};
+const CAPABILITY_DIMMABLE = 0x40;
+
+/**
+ * Derive switch characteristics from the capability byte in the raw device ID.
+ * Device ID format: "<model>+<serial>+<capabilityHex>", e.g. "WTY22173+0023D1+40".
+ * Known capabilities:
+ *   0x0C — single gang on/off
+ *   0x1C — double gang on/off, switch 1
+ *   0x1D — double gang on/off, switch 2
+ *   0x40 — single gang dimmable
+ */
+import { parseDeviceId } from './utils';
+
+export function getSwitchCharacteristics(rawDeviceId: string): switchCharacteristics {
+  const { capability } = parseDeviceId(rawDeviceId);
+  return {
+    dimmable: capability === CAPABILITY_DIMMABLE,
+  };
+}
