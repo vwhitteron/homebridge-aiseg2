@@ -1,3 +1,6 @@
+# MacOS hidden files
+.DS_Store
+
 # Ignore compiled code
 dist
 
