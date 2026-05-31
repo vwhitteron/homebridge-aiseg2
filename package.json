@@ -1,7 +1,6 @@
 {
   "name": "homebridge-aiseg2",
   "displayName": "Homebridge AiSEG2",
-  "type": "module",
   "version": "1.0.0",
   "private": false,
   "description": "Panasonic AiSEG2 plugin for Homebridge.",
