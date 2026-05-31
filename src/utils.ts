@@ -1,7 +1,4 @@
 
-import { load as LoadHtml } from 'cheerio';
-import { INIT_REGEX } from './constants';
-
 export function delay(ms: number) {
   return new Promise( resolve => setTimeout(resolve, ms) );
 }
