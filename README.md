@@ -1,19 +1,25 @@
+<span align="center">
 
-<p align="center">
-
-<img src="https://github.com/homebridge/branding/raw/master/logos/homebridge-wordmark-logo-vertical.png" width="150">
-
-</p>
-
-
-# Homebridge AiSEG2 Plugin
+# Homebridge AiSEG2
 
 A Homebridge platform plugin to control devices managed by a [Panasonic AiSEG2](https://www2.panasonic.biz/ls/densetsu/aiseg/) controller.
 
-* Panasonic Advance Series light switches
+[![npm](https://img.shields.io/npm/dt/homebridge-aiseg2)](https://www.npmjs.com/package/homebridge-aiseg2)  
 
-All development and testing has been performed using an MKN704 and MKN713 controllers and should also work with the MKN705 as well.
-Note that long term use of the MKN713 was not as stable as the MKN704 with the former failing to respond after a period of time.
+</span>
+
+## Disclaimer
+
+Homebridge AiSEG2 is independently developed and is not in any way affiliated with or endorsed by Panasonic. Any issues or damage resulting
+from use of this plugin are not the fault of the developer. Use at your own risk.
+
+## About
+
+Supports [Panasonic Advance Series Link Plus](https://www2.panasonic.biz/jp/densetsu/haisen/switch_concent/advance/lineup/linkplus/) light
+switches registered to a Panasonic AiSEG2 controller.
+
+All development and testing has been performed using an MKN704 and MKN713 controllers and should also work with the MKN705 as well. Note
+that long term use of the MKN713 was not as stable as the MKN704 with the former failing to respond after a period of time.
 
 ## Configuration
 
@@ -34,8 +40,8 @@ web interface.
         ],
     }]
 
-Setting colorTemperature to `true` enables temperature control for all dimmable switches. Devices can also override the global
-temperature control on an individual basis.
+Setting colorTemperature to `true` enables temperature control for all dimmable switches. Devices can also override the global temperature
+control on an individual basis.
 
 ## Future Development
 

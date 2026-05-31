@@ -1,4 +1,3 @@
-/* eslint-disable max-len */
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { Aiseg2Platform, Aiseg2Node } from './platform';
 import {

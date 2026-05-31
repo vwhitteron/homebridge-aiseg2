@@ -50,6 +50,11 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
+    if (!this.config.host || this.config.host === '127.0.0.1' || !this.config.password) {
+      this.log.warn('Plugin is not configured. Please set the host and password in the Homebridge settings.');
+      return;
+    }
+
     this.api.on('didFinishLaunching', () => {
       this.log.debug('Executed didFinishLaunching callback');
 
@@ -112,9 +117,25 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
   // Discover the various AiSEG2 device types that are compatible with Homekit
   async discoverDevices() {
-    const versionMap = await this.getVersionInfo();
-    await this.discoverWirelessDevices(versionMap);
-    await this.discoverNetworkDevices();
+    let versionMap: Map<string, string>;
+    try {
+      versionMap = await this.getVersionInfo();
+    } catch (err) {
+      this.log.error(`Failed to get device version info: ${err}`);
+      return;
+    }
+
+    try {
+      await this.discoverWirelessDevices(versionMap);
+    } catch (err) {
+      this.log.error(`Failed to discover wireless devices: ${err}`);
+    }
+
+    try {
+      await this.discoverNetworkDevices();
+    } catch (err) {
+      this.log.error(`Failed to discover network devices: ${err}`);
+    }
   }
 
   // Fetch firmware version info for all wireless devices, keyed by nodeId+eoj

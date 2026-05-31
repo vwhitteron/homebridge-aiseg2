@@ -1,10 +1,8 @@
-# MacOS hidden files
-.DS_Store
-
 # Ignore compiled code
 dist
 
 # ------------- Defaults ------------- #
+.DS_Store
 
 # Logs
 logs
@@ -121,5 +119,10 @@ dist
 .yarn/unplugged
 .yarn/build-state.yml
 .pnp.*
+
+# Webstorm
+.idea
+
+/test/hbConfig
 
 research/
