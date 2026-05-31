@@ -34,7 +34,58 @@
         "required": true,
         "default": "",
         "description": "Password used to login to the Panasonic AiSEG2 controller"
+      },
+      "colorTemperature": {
+        "title": "Linked Color Temperature",
+        "type": "boolean",
+        "default": false,
+        "description": "Expose a color temperature control linked to brightness for all dimmable lights (can be overridden per device)"
+      },
+      "devices": {
+        "title": "Device Overrides",
+        "type": "array",
+        "items": {
+          "title": "Device",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Device Name",
+              "type": "string",
+              "required": true,
+              "description": "Display name of the device as shown in AiSEG2"
+            },
+            "colorTemperature": {
+              "title": "Linked Color Temperature",
+              "type": "boolean",
+              "default": false,
+              "description": "Expose a color temperature control linked to brightness (dimmable lights only)"
+            }
+          }
+        }
       }
     }
-  }
+  },
+  "layout": [
+    "name",
+    "host",
+    "password",
+    "colorTemperature",
+    {
+      "type": "section",
+      "title": "Device Overrides",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        {
+          "key": "devices",
+          "type": "tabarray",
+          "title": "{{ value.name || 'New Device' }}",
+          "items": [
+            "devices[].name",
+            "devices[].colorTemperature"
+          ]
+        }
+      ]
+    }
+  ]
 }
