@@ -1,0 +1,20 @@
+services:
+  homebridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8581:8581"    # Homebridge UI
+      - "51846:51846"  # HAP (HomeKit pairing)
+      - "51846:51846/udp"
+    volumes:
+      - ./src:/workspace/src                              # Live source — nodemon watches this
+      - ./config.schema.json:/workspace/config.schema.json # Plugin settings UI schema
+      - homebridge_data:/var/lib/homebridge               # Persistent pairing and config state
+    environment:
+      - TZ=Asia/Tokyo
+      - NODE_OPTIONS=--trace-warnings
+    restart: unless-stopped
+
+volumes:
+  homebridge_data:

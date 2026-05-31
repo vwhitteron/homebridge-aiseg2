@@ -14,7 +14,6 @@
         },
         {
             "name": "AiSEG2",
-            "autodiscover": false,
             "host": "192.168.0.20",
             "password": "secretpassword",
             "platform": "AiSEG2"
