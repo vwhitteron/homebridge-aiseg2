@@ -26,11 +26,11 @@
         "default": "",
         "description": "Password used to login to the Panasonic AiSEG2 controller"
       },
-      "colorTemperature": {
-        "title": "Linked Color Temperature",
+      "synchroColourTone": {
+        "title": "Synchro Colour Tone",
+        "description": "When true, dimmable devices expose a colour temperature characteristic linked to brightness for use with Panasonic Synchro Colour Tone flat lamps.",
         "type": "boolean",
-        "default": false,
-        "description": "Expose a color temperature control linked to brightness for all dimmable lights (can be overridden per device)"
+        "default": false
       },
       "devices": {
         "title": "Device Overrides",
@@ -45,11 +45,11 @@
               "required": true,
               "description": "Display name of the device as shown in AiSEG2"
             },
-            "colorTemperature": {
-              "title": "Linked Color Temperature",
+            "synchroColourTone": {
+              "title": "Synchro Colour Tone",
+              "description": "When true, this dimmable device exposes a colour temperature characteristic linked to brightness for use with Panasonic Synchro Colour Tone flat lamps.",
               "type": "boolean",
-              "default": false,
-              "description": "Expose a color temperature control linked to brightness (dimmable lights only)"
+              "default": false
             }
           }
         }
@@ -60,7 +60,7 @@
     "name",
     "host",
     "password",
-    "colorTemperature",
+    "synchroColourTone",
     {
       "type": "section",
       "title": "Device Overrides",

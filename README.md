@@ -31,23 +31,49 @@ web interface.
         "name": "AiSEG2",
         "host": "<controller IP address>",
         "password": "<controller password>",
-        "colorTemperature": true,
+        "synchroColourTone": true,
         "devices": [
             {
                 "name": "<device name>",
-                "colorTemperature": false
+                "synchroColourTone": false
             }
         ],
     }]
 
-Setting colorTemperature to `true` enables temperature control for all dimmable switches. Devices can also override the global temperature
-control on an individual basis.
+### Options
+
+|          Option          |  Type   |      Default      |                              Description                                    |
+|--------------------------|---------|-------------------|-----------------------------------------------------------------------------|
+| `name`                   | string  | `"AiSEG2"`        | Display name for this platform instance in Homebridge.                      |
+| `host`                   | string  | `"127.0.0.1"`     | IP address of the AiSEG2 controller                                         |
+| `pasword`                | string  | `""`              | Basic auth password for the AiSEG2 controller                               |
+| `synchroColourTone`      | boolean | `false`           | Globally enable colour temperature characteristic for all dimmable devices. |
+| `devices`                | array   | `[]`              | Per-device overrides (see below).                                           |
+
+#### Per-device overrides
+
+Each entry in the `devices` array targets a specific device by its serial number. The plugin logs this value on first discovery and it can
+also be found under the accessory info panel in the web UI.
+
+|       Option        |  Type   | Req |                          Description                            |
+|---------------------|---------|-----|-----------------------------------------------------------------|
+| `name`              | string  | Yes | The name of the accessory.                                      |
+| `synchroColourTone` | boolean | No  | Per-device override for the global `synchroColourTone` setting. |
+
+## Synchro Colour Tone
+
+Panasonic offers [synchro colour tone](https://sumai.panasonic.jp/lighting/home/synchro/feature/) lamps that shift colour temperature
+directly in relation to the dimmer brightness setting. When `synchroColourTone` is `true`, the plugin exposes a HomeKit color temperature
+characteristic directly linked to brightness so when either the temperature or brightness controls are adjust the other moves in unison.
+This setting attempts to match the colour temperature and brightness curve that is applied within the lamp so that the colour temperature
+can be set andpo tentially support adaptive lighting in Apple Home.
 
 ## Future Development
 
 Since originally developing the codebase as a quick proof of concept I have added a Panasonic WTY2001 controller for some additional lights.
 This controller exposes the lights on the local network via Echonet Lite which is a much better interface and offers finer dimming control
-using [homebridge-echonet-lite](https://github.com/japaniot/homebridge-echonet-lite).
+using [homebridge-echonet-light](https://github.com/vwhitteron/homebridge-echonet-light) or
+[homebridge-echonet-lite](https://github.com/japaniot/homebridge-echonet-lite).
 
 The code as originally released was not very high quality and has since been massaged into better form with the assistance of AI tooling and
 is unlikely to see any further development as it works well enough for day to day use.

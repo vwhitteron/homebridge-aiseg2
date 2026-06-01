@@ -251,10 +251,10 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
 
           if (deviceData.dimmable === true) {
             deviceData.brightness = 0;
-            const globalColorTemp = (this.config.colorTemperature as boolean | undefined) ?? false;
-            const deviceConfig = (this.config.devices as Array<{ name: string; colorTemperature?: boolean }> | undefined)
+            const globalColorTemp = (this.config.synchroColourTone as boolean | undefined) ?? false;
+            const deviceConfig = (this.config.devices as Array<{ name: string; synchroColourTone?: boolean }> | undefined)
               ?.find(d => d.name === deviceData.displayName);
-            deviceData.colorTemperature = deviceConfig?.colorTemperature ?? globalColorTemp;
+            deviceData.colorTemperature = deviceConfig?.synchroColourTone ?? globalColorTemp;
           }
 
           const deviceUid = this.generateUid(device);
