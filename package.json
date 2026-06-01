@@ -1,7 +1,7 @@
 {
   "name": "homebridge-aiseg2",
   "displayName": "Homebridge AiSEG2",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "description": "Panasonic AiSEG2 plugin for Homebridge.",
   "author": "Vaughan Whitteron",
