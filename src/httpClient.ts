@@ -1,5 +1,6 @@
 import { request as HttpRequest, HttpMethod } from 'urllib';
 import { IncomingMessage } from 'http';
+import * as http from 'http';
 
 export interface AiSeg2RequestOptions {
   method: HttpMethod;
@@ -18,6 +19,8 @@ export interface AiSeg2Response {
  * Encapsulates common options: rejectUnauthorized, digestAuth, and default headers.
  */
 export class AiSeg2HttpClient {
+  private readonly agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+
   constructor(
     private readonly host: string,
     private readonly password: string,
@@ -48,8 +51,16 @@ export class AiSeg2HttpClient {
       digestAuth: this.getDigestAuth(),
       headers: options.headers ?? this.getDefaultHeaders(),
       data: options.data,
+      agent: this.agent,
     });
     return { data: data as string, res: res as IncomingMessage };
+  }
+
+  /**
+   * Release pooled keepalive sockets. Call on shutdown.
+   */
+  close(): void {
+    this.agent.destroy();
   }
 
   /**

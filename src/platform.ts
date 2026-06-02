@@ -390,5 +390,6 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       this.deviceStateRefreshTimer = undefined;
       this.log.debug('Cleared device state refresh timer');
     }
+    this.httpClient.close();
   }
 }
