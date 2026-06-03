@@ -339,37 +339,48 @@ export class Aiseg2Platform implements DynamicPlatformPlugin {
       });
     }
 
-    const payload = `data={"page":"1","list":${JSON.stringify(payloadDevices)}}`;
+    const PAGE_SIZE = 8;
 
-    try {
-      const { data, res } = await this.httpClient.post(url, payload);
+    for (let pageNum = 0; pageNum < Math.ceil(payloadDevices.length / PAGE_SIZE); pageNum++) {
+      const pageDevices = payloadDevices.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE);
+      const payload = `data={"page":"${pageNum + 1}","list":${JSON.stringify(pageDevices)}}`;
 
-      if (res.statusCode !== HTTP_OK_STATUS) {
-        this.backoff = Math.min(this.backoff + BACKOFF_INCREMENT, BACKOFF_MAX);
-        this.log.info(`HTTP post failed with status ${res.statusCode}: ${res.statusMessage}`);
-        return;
-      }
+      try {
+        const { data, res } = await this.httpClient.post(url, payload);
 
-      this.backoff = 0;
+        if (res.statusCode !== HTTP_OK_STATUS) {
+          this.backoff = Math.min(this.backoff + BACKOFF_INCREMENT, BACKOFF_MAX);
+          this.log.info(`HTTP post failed with status ${res.statusCode}: ${res.statusMessage}`);
+          return;
+        }
 
-      const deviceStateData = JSON.parse(data);
+        this.backoff = 0;
 
-      for (const device of deviceStateData.panelData) {
-        const devId = device.nodeId + device.eoj;
-        const accessory = this.devices[devId];
-        if (!accessory) {
-          this.log.debug(`Unknown device ${devId}, skipping state update`);
+        const deviceStateData = JSON.parse(data);
+
+        if (!Array.isArray(deviceStateData.panelData)) {
+          this.log.warn(`No panelData in response for page ${pageNum + 1} (${pageDevices.length} devices); response keys: ${Object.keys(deviceStateData)}`);
           continue;
         }
-        accessory.updateLightingState({
-          ...accessory.getDeviceContext(),
-          state: device.state,
-          brightness: device.modulate_level * BRIGHTNESS_MULTIPLIER,
-        });
+
+        for (const device of deviceStateData.panelData) {
+          const devId = device.nodeId + device.eoj;
+          const accessory = this.devices[devId];
+          if (!accessory) {
+            this.log.debug(`Unknown device ${devId}, skipping state update`);
+            continue;
+          }
+          accessory.updateLightingState({
+            ...accessory.getDeviceContext(),
+            state: device.state,
+            brightness: device.modulate_level * BRIGHTNESS_MULTIPLIER,
+          });
+        }
+      } catch (err) {
+        this.backoff = Math.min(this.backoff + BACKOFF_INCREMENT, BACKOFF_MAX);
+        this.log.info(`Failed to update device states (page ${pageNum + 1}, ${pageDevices.length} devices in payload): ${err}`);
+        return;
       }
-    } catch (err) {
-      this.backoff = Math.min(this.backoff + BACKOFF_INCREMENT, BACKOFF_MAX);
-      this.log.error(`Failed to update device states: ${err}`);
     }
   }
 

@@ -2,6 +2,8 @@ import { request as HttpRequest, HttpMethod } from 'urllib';
 import { IncomingMessage } from 'http';
 import * as http from 'http';
 
+import { HTTP_CONNECT_TIMEOUT_MS, HTTP_RESPONSE_TIMEOUT_MS } from './constants';
+
 export interface AiSeg2RequestOptions {
   method: HttpMethod;
   password: string;
@@ -52,6 +54,7 @@ export class AiSeg2HttpClient {
       headers: options.headers ?? this.getDefaultHeaders(),
       data: options.data,
       agent: this.agent,
+      timeout: [HTTP_CONNECT_TIMEOUT_MS, HTTP_RESPONSE_TIMEOUT_MS],
     });
     return { data: data as string, res: res as IncomingMessage };
   }

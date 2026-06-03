@@ -8,6 +8,8 @@ export const DEVICE_STATE_REFRESH_INTERVAL_MS = 2500;
 // HTTP
 // ============================================================
 export const HTTP_OK_STATUS = 200;
+export const HTTP_CONNECT_TIMEOUT_MS = 1000;
+export const HTTP_RESPONSE_TIMEOUT_MS = 2000;
 
 // ============================================================
 // Polling
